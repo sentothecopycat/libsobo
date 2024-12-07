@@ -55,4 +55,4 @@ function displayResults(results) {
   });
 
   table.style.display = 'table';
-}
+    }
