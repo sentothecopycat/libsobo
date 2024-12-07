@@ -1,27 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Search and Download Books</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Libsobo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin: 5px 0;
+        }
+        a {
+            text-decoration: none;
+            color: #007BFF;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-  <h1>Search and Download Books</h1>
-  <input type="text" id="searchInput" placeholder="Enter book title or author">
-  <button onclick="searchBooks()">Search</button>
+    <h1>Libsobo</h1>
+    <p>Search and download books in various formats.</p>
+    <input type="text" id="searchBox" placeholder="Search for a book..." oninput="filterBooks()">
+    <ul id="bookList">
+        <!-- Book links will be populated here -->
+    </ul>
 
-  <table id="resultsTable" style="display: none;">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Author</th>
-        <th>Format</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    <script>
+        const books = [
+            { name: "Book One.epub", path: "EN/Books/A_Street_Cat_Named_Bob_-_James_Bowen.epub" }
+        ];
 
-  <script src="script.js"></script>
+        const bookList = document.getElementById('bookList');
+
+        function displayBooks() {
+            bookList.innerHTML = books.map(book => `
+                <li><a href="${book.path}" download>${book.name}</a></li>
+            `).join('');
+        }
+
+        function filterBooks() {
+            const query = document.getElementById('searchBox').value.toLowerCase();
+            const filteredBooks = books.filter(book => book.name.toLowerCase().includes(query));
+            bookList.innerHTML = filteredBooks.map(book => `
+                <li><a href="${book.path}" download>${book.name}</a></li>
+            `).join('');
+        }
+
+        displayBooks();
+    </script>
 </body>
-      </html>
+</html>
