@@ -12,15 +12,18 @@ fetch('EN/metadata.json')
     books = data;
     console.log("Books loaded:", books); // Debugging: Check loaded books
   })
-  .catch(error => console.error("Error loading metadata:", error));
+  .catch(error => {
+    console.error("Error loading metadata:", error);
+    alert("Error loading book data. Please try again later.");
+  });
 
 // Search function
 function searchBooks() {
-  const query = document.getElementById('searchInput').value.toLowerCase();
+  const query = document.getElementById('searchInput').value.toLowerCase().trim();
   console.log("Search query:", query); // Debugging: Check query
 
   const results = books.filter(book =>
-    book.title.toLowerCase().includes(query) || 
+    book.title.toLowerCase().includes(query) ||
     book.author.toLowerCase().includes(query)
   );
 
