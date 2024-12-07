@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Book 1",
+    "author": "Author 1",
+    "format": "pdf",
+    "path": "EN/Books/book1.pdf"
+  },
+  {
+    "title": "Book 2",
+    "author": "Author 2",
+    "format": "epub",
+    "path": "EN/Books/book2.epub"
+  },
+  {
+    "title": "Book 3",
+    "author": "Author 3",
+    "format": "mobi",
+    "path": "EN/Books/book3.mobi"
+  }
+]
