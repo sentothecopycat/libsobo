@@ -2,18 +2,29 @@ let books = [];
 
 // Load metadata.json
 fetch('EN/metadata.json')
-  .then(response => response.json())
-  .then(data => books = data)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Failed to load metadata: ${response.statusText}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    books = data;
+    console.log("Books loaded:", books); // Debugging: Check loaded books
+  })
   .catch(error => console.error("Error loading metadata:", error));
 
 // Search function
 function searchBooks() {
   const query = document.getElementById('searchInput').value.toLowerCase();
+  console.log("Search query:", query); // Debugging: Check query
+
   const results = books.filter(book =>
     book.title.toLowerCase().includes(query) || 
     book.author.toLowerCase().includes(query)
   );
 
+  console.log("Search results:", results); // Debugging: Check filtered results
   displayResults(results);
 }
 
@@ -41,4 +52,4 @@ function displayResults(results) {
   });
 
   table.style.display = 'table';
-      }
+}
