@@ -14,7 +14,7 @@
         h1 {
             text-align: center;
         }
-        input[type="text"] {
+        input, select {
             width: 100%;
             padding: 10px;
             margin-bottom: 20px;
@@ -41,47 +41,94 @@
     <h1>Libsobo</h1>
     <p>Search and download books in various formats.</p>
     <input type="text" id="searchBox" placeholder="Search for a book..." oninput="filterBooks()">
+    <select id="formatFilter" onchange="filterBooks()">
+        <option value="">All Formats</option>
+        <option value="epub">EPUB</option>
+        <option value="pdf">PDF</option>
+        <option value="mobi">MOBI</option>
+    </select>
+    <select id="authorFilter" onchange="filterBooks()">
+        <option value="">All Authors</option>
+    </select>
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
 
     <script>
         const repoOwner = 'sentothecopycat'; // Replace with your GitHub username
-        const repoName = 'libsobo';       // Replace with your repository name
-        const folderPath = 'EN/Books';          // Folder containing the books
+        const repoName = 'libsobo';         // Replace with your repository name
+        const folderPath = 'EN';           // Root folder containing author folders
 
         let books = []; // Array to store book data
+        let authors = new Set(); // Set to track unique authors
 
         // Fetch book data from GitHub API
         async function fetchBooksFromGitHub() {
             const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}`);
             if (response.ok) {
-                const files = await response.json();
-                books = files
-                    .filter(file => file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) // Filter formats
-                    .map(file => ({
-                        name: file.name.replace("_", " ").replace(/\.[^/.]+$/, ""), // Clean file name
-                        path: file.download_url // Get file download URL
-                    }));
-
+                const authorFolders = await response.json();
+                for (const folder of authorFolders) {
+                    if (folder.type === 'dir') { // Only process directories
+                        const authorName = folder.name.replace("_", " ");
+                        const booksResponse = await fetch(folder.url); // Fetch books in the author folder
+                        if (booksResponse.ok) {
+                            const files = await booksResponse.json();
+                            files.forEach(file => {
+                                if (file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) {
+                                    books.push({
+                                        name: file.name.replace("_", " ").replace(/\.[^/.]+$/, ""), // Clean file name
+                                        path: file.download_url,
+                                        author: authorName,
+                                        format: file.name.split('.').pop().toUpperCase()
+                                    });
+                                }
+                            });
+                            authors.add(authorName); // Track author
+                        }
+                    }
+                }
+                populateAuthorFilter(); // Populate author filter dropdown
                 displayBooks(books); // Show all books initially
             } else {
                 console.error('Failed to fetch books from GitHub');
             }
         }
 
+        // Populate author filter dropdown
+        function populateAuthorFilter() {
+            const authorFilter = document.getElementById('authorFilter');
+            authors.forEach(author => {
+                const option = document.createElement('option');
+                option.value = author;
+                option.textContent = author;
+                authorFilter.appendChild(option);
+            });
+        }
+
         // Display books in the list
         function displayBooks(bookArray) {
             const bookList = document.getElementById('bookList');
             bookList.innerHTML = bookArray.map(book => `
-                <li><a href="${book.path}" download>${book.name}</a></li>
+                <li>
+                    <a href="${book.path}" download>${book.name}</a> 
+                    <span>(${book.format}) by ${book.author}</span>
+                </li>
             `).join('');
         }
 
-        // Filter books based on search query
+        // Filter books based on search query, format, and author
         function filterBooks() {
             const query = document.getElementById('searchBox').value.toLowerCase();
-            const filteredBooks = books.filter(book => book.name.toLowerCase().includes(query));
+            const selectedFormat = document.getElementById('formatFilter').value.toLowerCase();
+            const selectedAuthor = document.getElementById('authorFilter').value;
+
+            const filteredBooks = books.filter(book => {
+                const matchesQuery = book.name.toLowerCase().includes(query);
+                const matchesFormat = !selectedFormat || book.format.toLowerCase() === selectedFormat;
+                const matchesAuthor = !selectedAuthor || book.author === selectedAuthor;
+
+                return matchesQuery && matchesFormat && matchesAuthor;
+            });
             displayBooks(filteredBooks);
         }
 
