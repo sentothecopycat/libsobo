@@ -39,17 +39,8 @@
 </head>
 <body>
     <h1>Libsobo</h1>
-    <p>Search and download books in various formats.</p>
-    <input type="text" id="searchBox" placeholder="Search for a book..." oninput="filterBooks()">
-    <select id="formatFilter" onchange="filterBooks()">
-        <option value="">All Formats</option>
-        <option value="epub">EPUB</option>
-        <option value="pdf">PDF</option>
-        <option value="mobi">MOBI</option>
-    </select>
-    <select id="authorFilter" onchange="filterBooks()">
-        <option value="">All Authors</option>
-    </select>
+    <p>Search and download books in various formats. You can search by book name, author, or format.</p>
+    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="filterBooks()">
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
@@ -60,7 +51,6 @@
         const folderPath = 'EN';           // Root folder containing author folders
 
         let books = []; // Array to store book data
-        let authors = new Set(); // Set to track unique authors
 
         // Fetch book data from GitHub API
         async function fetchBooksFromGitHub() {
@@ -83,26 +73,13 @@
                                     });
                                 }
                             });
-                            authors.add(authorName); // Track author
                         }
                     }
                 }
-                populateAuthorFilter(); // Populate author filter dropdown
                 displayBooks(books); // Show all books initially
             } else {
                 console.error('Failed to fetch books from GitHub');
             }
-        }
-
-        // Populate author filter dropdown
-        function populateAuthorFilter() {
-            const authorFilter = document.getElementById('authorFilter');
-            authors.forEach(author => {
-                const option = document.createElement('option');
-                option.value = author;
-                option.textContent = author;
-                authorFilter.appendChild(option);
-            });
         }
 
         // Display books in the list
@@ -116,18 +93,16 @@
             `).join('');
         }
 
-        // Filter books based on search query, format, and author
+        // Filter books based on search query (by name, author, or format)
         function filterBooks() {
             const query = document.getElementById('searchBox').value.toLowerCase();
-            const selectedFormat = document.getElementById('formatFilter').value.toLowerCase();
-            const selectedAuthor = document.getElementById('authorFilter').value;
 
             const filteredBooks = books.filter(book => {
-                const matchesQuery = book.name.toLowerCase().includes(query);
-                const matchesFormat = !selectedFormat || book.format.toLowerCase() === selectedFormat;
-                const matchesAuthor = !selectedAuthor || book.author === selectedAuthor;
-
-                return matchesQuery && matchesFormat && matchesAuthor;
+                return (
+                    book.name.toLowerCase().includes(query) || // Match book name
+                    book.author.toLowerCase().includes(query) || // Match author name
+                    book.format.toLowerCase().includes(query) // Match format
+                );
             });
             displayBooks(filteredBooks);
         }
@@ -137,4 +112,3 @@
     </script>
 </body>
 </html>
-
