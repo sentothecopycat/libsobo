@@ -35,30 +35,6 @@
         a:hover {
             text-decoration: underline;
         }
-        .preview {
-            display: none;
-            border: 1px solid #ccc;
-            padding: 20px;
-            margin-top: 20px;
-            border-radius: 5px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .preview img {
-            max-width: 100%;
-            height: auto;
-            margin-bottom: 20px;
-        }
-        .preview button {
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .preview button:hover {
-            background-color: #0056b3;
-        }
     </style>
 </head>
 <body>
@@ -68,16 +44,6 @@
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
-
-    <!-- Preview section -->
-    <div id="preview" class="preview">
-        <img id="previewImage" src="https://via.placeholder.com/300x400?text=Book+Cover" alt="Book Cover">
-        <h2 id="previewName">Book Name</h2>
-        <p><strong>Author:</strong> <span id="previewAuthor"></span></p>
-        <p><strong>Format:</strong> <span id="previewFormat"></span></p>
-        <button id="downloadButton">Download</button>
-        <button onclick="closePreview()">Close</button>
-    </div>
 
     <script>
         const repoOwner = 'sentothecopycat'; // Replace with your GitHub username
@@ -122,27 +88,70 @@
             const bookList = document.getElementById('bookList');
             bookList.innerHTML = bookArray.map((book, index) => `
                 <li>
-                    <a href="#" onclick="showPreview(${index})">${book.name}</a>
+                    <a href="#" onclick="openPreviewPage(${index})">${book.name}</a>
                 </li>
             `).join('');
         }
 
-        // Show preview of the selected book
-        function showPreview(index) {
+        // Open a new page with book preview
+        function openPreviewPage(index) {
             const book = books[index];
-            document.getElementById('previewImage').src = book.cover;
-            document.getElementById('previewName').textContent = book.name;
-            document.getElementById('previewAuthor').textContent = book.author;
-            document.getElementById('previewFormat').textContent = book.format;
-            document.getElementById('downloadButton').onclick = () => {
-                window.location.href = book.path;
-            };
-            document.getElementById('preview').style.display = 'block';
-        }
+            const previewWindow = window.open('', '_blank');
 
-        // Close the preview
-        function closePreview() {
-            document.getElementById('preview').style.display = 'none';
+            // Dynamically generate the preview page content
+            previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${book.name} - Preview</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            max-width: 800px;
+                            margin: auto;
+                            padding: 20px;
+                        }
+                        h1 {
+                            text-align: center;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                            display: block;
+                            margin: 20px auto;
+                        }
+                        p {
+                            font-size: 18px;
+                            margin: 10px 0;
+                        }
+                        button {
+                            padding: 10px 20px;
+                            background-color: #007BFF;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            display: block;
+                            margin: 20px auto;
+                        }
+                        button:hover {
+                            background-color: #0056b3;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${book.name}</h1>
+                    <img src="${book.cover}" alt="Book Cover">
+                    <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>Format:</strong> ${book.format}</p>
+                    <button onclick="window.location.href='${book.path}'">Download</button>
+                </body>
+                </html>
+            `);
+
+            previewWindow.document.close();
         }
 
         // Filter books based on search query (by name, author, or format)
@@ -163,4 +172,4 @@
         fetchBooksFromGitHub();
     </script>
 </body>
-    </html>
+</html>
