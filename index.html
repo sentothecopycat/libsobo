@@ -105,17 +105,19 @@
                 });
                 await Promise.all(fetchPromises);
                 displayBooks(books); // Show all books initially
-                fetchCovers(); // Fetch covers in the background
+                fetchCovers(books); // Fetch covers in the background
             } else {
                 console.error('Failed to fetch books from GitHub');
             }
         }
 
-        // Fetch covers in batches for all books
-        async function fetchCovers() {
-            const coverPromises = books.map(async (book) => {
-                const cover = await getBookCover(book.name);
-                book.cover = cover;
+        // Fetch covers for a given list of books
+        async function fetchCovers(bookList) {
+            const coverPromises = bookList.map(async (book) => {
+                if (!book.cover) { // Only fetch if cover isn't already loaded
+                    const cover = await getBookCover(book.name);
+                    book.cover = cover;
+                }
                 updateCover(book);
             });
             await Promise.all(coverPromises);
@@ -224,6 +226,7 @@
                 );
             });
             displayBooks(filteredBooks);
+            fetchCovers(filteredBooks); // Fetch covers for the filtered books
         }
 
         // Debounce for search input
