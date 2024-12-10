@@ -39,8 +39,8 @@
 </head>
 <body>
     <h1>Libsobo</h1>
-    <p>Search and download books in various formats. You can search by book name, author, or format.</p>
-    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="filterBooks()">
+    <p>Search and browse books, comics, and other content by author and type. Covers are fetched automatically.</p>
+    <input type="text" id="searchBox" placeholder="Search by book name, author, type, or format..." oninput="filterBooks()">
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
@@ -52,28 +52,53 @@
 
         let books = []; // Array to store book data
 
-        // Fetch book data from GitHub API
+        // Fetch cover from Google Books API or fallback to placeholder
+        async function getBookCover(bookTitle) {
+            try {
+                const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(bookTitle)}`);
+                const data = await response.json();
+                if (data.items && data.items[0].volumeInfo.imageLinks) {
+                    return data.items[0].volumeInfo.imageLinks.thumbnail; // Cover URL
+                }
+            } catch (error) {
+                console.error("Error fetching cover from Google Books API:", error);
+            }
+            return "https://via.placeholder.com/300x400?text=No+Cover+Available"; // Fallback cover
+        }
+
+        // Fetch data recursively from GitHub API
         async function fetchBooksFromGitHub() {
             const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}`);
             if (response.ok) {
                 const authorFolders = await response.json();
-                for (const folder of authorFolders) {
-                    if (folder.type === 'dir') { // Only process directories
-                        const authorName = folder.name.replace("_", " ");
-                        const booksResponse = await fetch(folder.url); // Fetch books in the author folder
-                        if (booksResponse.ok) {
-                            const files = await booksResponse.json();
-                            files.forEach(file => {
-                                if (file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) {
-                                    books.push({
-                                        name: file.name.replace("_", " ").replace(/\.[^/.]+$/, ""), // Clean file name
-                                        path: file.download_url,
-                                        author: authorName,
-                                        format: file.name.split('.').pop().toUpperCase(),
-                                        cover: "https://via.placeholder.com/300x400?text=" + encodeURIComponent(file.name) // Placeholder cover image
-                                    });
+                for (const author of authorFolders) {
+                    if (author.type === 'dir') { // Process author directories
+                        const authorName = author.name.replace("_", " ");
+                        const contentTypesResponse = await fetch(author.url);
+                        if (contentTypesResponse.ok) {
+                            const contentTypes = await contentTypesResponse.json();
+                            for (const type of contentTypes) {
+                                if (type.type === 'dir') { // Process type folders
+                                    const typeName = type.name;
+                                    const booksResponse = await fetch(type.url);
+                                    if (booksResponse.ok) {
+                                        const files = await booksResponse.json();
+                                        for (const file of files) {
+                                            if (file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) {
+                                                const cover = await getBookCover(file.name.replace(/\.[^/.]+$/, ""));
+                                                books.push({
+                                                    name: file.name.replace("_", " ").replace(/\.[^/.]+$/, ""),
+                                                    path: file.download_url,
+                                                    author: authorName,
+                                                    type: typeName,
+                                                    format: file.name.split('.').pop().toUpperCase(),
+                                                    cover: cover,
+                                                });
+                                            }
+                                        }
+                                    }
                                 }
-                            });
+                            }
                         }
                     }
                 }
@@ -88,7 +113,7 @@
             const bookList = document.getElementById('bookList');
             bookList.innerHTML = bookArray.map((book, index) => `
                 <li>
-                    <a href="#" onclick="openPreviewPage(${index})">${book.name}</a>
+                    <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
                 </li>
             `).join('');
         }
@@ -145,6 +170,7 @@
                     <h1>${book.name}</h1>
                     <img src="${book.cover}" alt="Book Cover">
                     <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>Type:</strong> ${book.type}</p>
                     <p><strong>Format:</strong> ${book.format}</p>
                     <button onclick="window.location.href='${book.path}'">Download</button>
                 </body>
@@ -154,7 +180,7 @@
             previewWindow.document.close();
         }
 
-        // Filter books based on search query (by name, author, or format)
+        // Filter books based on search query (by name, author, type, or format)
         function filterBooks() {
             const query = document.getElementById('searchBox').value.toLowerCase();
 
@@ -162,6 +188,7 @@
                 return (
                     book.name.toLowerCase().includes(query) || // Match book name
                     book.author.toLowerCase().includes(query) || // Match author name
+                    book.type.toLowerCase().includes(query) || // Match type (Book, Comic, etc.)
                     book.format.toLowerCase().includes(query) // Match format
                 );
             });
@@ -173,3 +200,4 @@
     </script>
 </body>
 </html>
+
