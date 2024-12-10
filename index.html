@@ -65,7 +65,8 @@
         const repoName = 'libsobo';         // Replace with your repository name
         const folderPath = 'EN';           // Root folder containing author folders
 
-        let books = []; // Array to store book data
+        let books = []; // Array to store all books
+        let filteredBooks = []; // Array to store the current filtered books
         let searchTimeout = null; // For debounced search
 
         // Fetch data recursively from GitHub API
@@ -104,8 +105,9 @@
                     }
                 });
                 await Promise.all(fetchPromises);
-                displayBooks(books); // Show all books initially
-                fetchCovers(books); // Fetch covers in the background
+                filteredBooks = [...books]; // Initially, filtered books are all books
+                displayBooks(filteredBooks);
+                fetchCovers(filteredBooks);
             } else {
                 console.error('Failed to fetch books from GitHub');
             }
@@ -157,7 +159,7 @@
 
         // Open a new page with book preview
         function openPreviewPage(index) {
-            const book = books[index];
+            const book = filteredBooks[index]; // Use the filtered books array
             const previewWindow = window.open('', '_blank');
             previewWindow.document.write(`
                 <!DOCTYPE html>
@@ -217,7 +219,7 @@
         // Filter books based on search query (debounced)
         function filterBooks() {
             const query = document.getElementById('searchBox').value.toLowerCase();
-            const filteredBooks = books.filter(book => {
+            filteredBooks = books.filter(book => {
                 return (
                     book.name.toLowerCase().includes(query) || 
                     book.author.toLowerCase().includes(query) || 
