@@ -46,6 +46,10 @@
         a:hover {
             text-decoration: underline;
         }
+        span {
+            font-size: 0.9em;
+            color: #555;
+        }
     </style>
 </head>
 <body>
@@ -71,7 +75,7 @@
                 const authorFolders = await authorResponse.json();
                 const fetchPromises = authorFolders.map(async (author) => {
                     if (author.type === 'dir') {
-                        const authorName = author.name.replace("_", " ");
+                        const authorName = author.name.replace(/_/g, " ");
                         const typeResponse = await fetch(author.url);
                         if (typeResponse.ok) {
                             const typeFolders = await typeResponse.json();
@@ -84,7 +88,7 @@
                                         files.forEach(file => {
                                             if (file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) {
                                                 books.push({
-                                                    name: file.name.replace("_", " ").replace(/\.[^/.]+$/, ""),
+                                                    name: file.name.replace(/_/g, " ").replace(/\.[^/.]+$/, ""),
                                                     path: file.download_url,
                                                     author: authorName,
                                                     type: typeName,
@@ -144,6 +148,7 @@
                 <li>
                     <img src="https://via.placeholder.com/50x70?text=Loading..." alt="Cover" data-book="${book.name}">
                     <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
+                    <span>- ${book.author} | ${book.format}</span>
                 </li>
             `).join('');
         }
