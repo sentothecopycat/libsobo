@@ -90,7 +90,8 @@
                                         files.forEach(file => {
                                             if (file.name.endsWith('.epub') || file.name.endsWith('.pdf') || file.name.endsWith('.mobi')) {
                                                 books.push({
-                                                    name: file.name.replace(/_/g, " ").replace(/\.[^/.]+$/, ""),
+                                                    originalName: file.name, // Preserve the original name with underscores
+                                                    name: file.name.replace(/_/g, " ").replace(/\.[^/.]+$/, ""), // Display name
                                                     path: file.download_url,
                                                     author: authorName,
                                                     type: typeName,
@@ -117,8 +118,8 @@
         // Fetch covers for a given list of books
         async function fetchCovers(bookList) {
             const coverPromises = bookList.map(async (book) => {
-                if (!book.cover) { // Only fetch if cover isn't already loaded
-                    const localCover = await getLocalCover(book.name);
+                if (!book.cover) {
+                    const localCover = await getLocalCover(book.originalName);
                     book.cover = localCover || await getGoogleCover(book.name); // Use local cover or fallback to Google API
                 }
                 updateCover(book);
@@ -127,10 +128,10 @@
         }
 
         // Check for local cover in the covers folder
-        async function getLocalCover(bookName) {
+        async function getLocalCover(bookNameWithUnderscores) {
             const possibleExtensions = ['jpg', 'png', 'jpeg']; // Common image formats
             for (const ext of possibleExtensions) {
-                const coverUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/${coversPath}/${bookName}.${ext}`;
+                const coverUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/${coversPath}/${bookNameWithUnderscores}.${ext}`;
                 try {
                     const response = await fetch(coverUrl);
                     if (response.ok) {
@@ -259,5 +260,4 @@
         fetchBooksFromGitHub();
     </script>
 </body>
-</html>
-
+    </html>
