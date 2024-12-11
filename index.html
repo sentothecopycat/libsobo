@@ -77,34 +77,43 @@
                 const fetchPromises = authorFolders.map(async (author) => {
                     if (author.type === 'dir') {
                         const authorName = author.name.replace(/_/g, " ");
-                        const bookFoldersResponse = await fetch(author.url);
-                        if (bookFoldersResponse.ok) {
-                            const bookFolders = await bookFoldersResponse.json();
-                            return Promise.all(bookFolders.map(async (bookFolder) => {
-                                if (bookFolder.type === 'dir') {
-                                    const bookResponse = await fetch(bookFolder.url);
-                                    if (bookResponse.ok) {
-                                        const files = await bookResponse.json();
-                                        const bookFile = files.find(file =>
-                                            file.name.endsWith('.epub') ||
-                                            file.name.endsWith('.pdf') ||
-                                            file.name.endsWith('.mobi')
-                                        );
-                                        const imageFile = files.find(file =>
-                                            file.name.endsWith('.jpg') ||
-                                            file.name.endsWith('.png') ||
-                                            file.name.endsWith('.jpeg')
-                                        );
+                        const typeFoldersResponse = await fetch(author.url);
+                        if (typeFoldersResponse.ok) {
+                            const typeFolders = await typeFoldersResponse.json();
+                            return Promise.all(typeFolders.map(async (type) => {
+                                if (type.type === 'dir') {
+                                    const bookFoldersResponse = await fetch(type.url);
+                                    if (bookFoldersResponse.ok) {
+                                        const bookFolders = await bookFoldersResponse.json();
+                                        return Promise.all(bookFolders.map(async (bookFolder) => {
+                                            if (bookFolder.type === 'dir') {
+                                                const bookResponse = await fetch(bookFolder.url);
+                                                if (bookResponse.ok) {
+                                                    const files = await bookResponse.json();
+                                                    const bookFile = files.find(file =>
+                                                        file.name.endsWith('.epub') ||
+                                                        file.name.endsWith('.pdf') ||
+                                                        file.name.endsWith('.mobi')
+                                                    );
+                                                    const imageFile = files.find(file =>
+                                                        file.name.endsWith('.jpg') ||
+                                                        file.name.endsWith('.png') ||
+                                                        file.name.endsWith('.jpeg')
+                                                    );
 
-                                        if (bookFile) {
-                                            books.push({
-                                                name: bookFolder.name.replace(/_/g, " "),
-                                                path: bookFile.download_url,
-                                                author: authorName,
-                                                format: bookFile.name.split('.').pop().toUpperCase(),
-                                                cover: imageFile ? imageFile.download_url : null // Use image if exists
-                                            });
-                                        }
+                                                    if (bookFile) {
+                                                        books.push({
+                                                            name: bookFolder.name.replace(/_/g, " "),
+                                                            path: bookFile.download_url,
+                                                            author: authorName,
+                                                            type: type.name,
+                                                            format: bookFile.name.split('.').pop().toUpperCase(),
+                                                            cover: imageFile ? imageFile.download_url : null // Use image if exists
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }));
                                     }
                                 }
                             }));
@@ -158,8 +167,8 @@
             bookList.innerHTML = bookArray.map((book, index) => `
                 <li>
                     <img src="https://via.placeholder.com/50x70?text=Loading..." alt="Cover" data-book="${book.name}">
-                    <a href="#" onclick="openPreviewPage(${index})">${book.name} - ${book.author}</a>
-                    <span>${book.format}</span>
+                    <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
+                    <span>- ${book.author} | ${book.format}</span>
                 </li>
             `).join('');
         }
@@ -214,6 +223,7 @@
                     <h1>${book.name}</h1>
                     <img src="${book.cover || 'https://via.placeholder.com/300x400?text=No+Cover'}" alt="Book Cover">
                     <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>Type:</strong> ${book.type}</p>
                     <p><strong>Format:</strong> ${book.format}</p>
                     <button onclick="window.location.href='${book.path}'">Download</button>
                 </body>
@@ -229,6 +239,7 @@
                 return (
                     book.name.toLowerCase().includes(query) || 
                     book.author.toLowerCase().includes(query) || 
+                    book.type.toLowerCase().includes(query) || 
                     book.format.toLowerCase().includes(query)
                 );
             });
@@ -246,4 +257,4 @@
         fetchBooksFromGitHub();
     </script>
 </body>
-    </html>
+</html>
