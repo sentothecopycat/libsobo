@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Libsobo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -50,21 +52,14 @@
             font-size: 0.9em;
             color: #555;
         }
-        .back-btn {
-            margin-bottom: 20px;
-            cursor: pointer;
-            color: #007BFF;
-        }
-        .back-btn:hover {
-            text-decoration: underline;
-        }
         button {
-            padding: 10px 15px;
+            padding: 10px 20px;
             background-color: #007BFF;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin: 10px 5px 0 0;
         }
         button:hover {
             background-color: #0056b3;
@@ -73,31 +68,22 @@
 </head>
 <body>
     <h1>Libsobo</h1>
-    <p>Search and browse books, comics, and collections by author and type. Covers are loaded dynamically.</p>
-    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="debouncedFilterBooks()">
-    <div id="collectionView" style="display: none;">
-        <span class="back-btn" onclick="showMainView()">← Back to Main</span>
-        <h2 id="collectionTitle"></h2>
-        <button id="downloadAllBtn" onclick="downloadAllBooks()">Download All as ZIP</button>
-        <ul id="collectionList"></ul>
-    </div>
+    <p>Search and browse books, comics, and other content by author and type. Collections and books are dynamically loaded from folder contents.</p>
+    <input type="text" id="searchBox" placeholder="Search by book name, author, or type..." oninput="debouncedFilterBooks()">
     <ul id="bookList">
         <!-- Book and collection links will be populated here -->
     </ul>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         const repoOwner = 'sentothecopycat'; // Replace with your GitHub username
         const repoName = 'libsobo';         // Replace with your repository name
         const folderPath = 'EN';           // Root folder containing author folders
 
-        let books = []; // Array to store all books
-        let collections = {}; // Object to store collections
-        let filteredBooks = []; // Array to store the current filtered books
-        let currentCollection = null; // Store the currently viewed collection
+        let books = []; // Array to store all books and collections
+        let filteredBooks = []; // Array to store the current filtered books and collections
         let searchTimeout = null; // For debounced search
 
-        // Fetch data recursively from GitHub API
+        // Fetch books and collections from GitHub API
         async function fetchBooksFromGitHub() {
             const authorResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}`);
             if (authorResponse.ok) {
@@ -110,41 +96,18 @@
                             const typeFolders = await typeFoldersResponse.json();
                             return Promise.all(typeFolders.map(async (type) => {
                                 if (type.type === 'dir') {
-                                    if (type.name.includes('[') && type.name.includes(']')) {
-                                        // It's a collection
-                                        collections[type.name] = [];
-                                        const collectionFoldersResponse = await fetch(type.url);
-                                        if (collectionFoldersResponse.ok) {
-                                            const collectionFolders = await collectionFoldersResponse.json();
-                                            return Promise.all(collectionFolders.map(async (bookFolder) => {
-                                                if (bookFolder.type === 'dir') {
-                                                    const bookResponse = await fetch(bookFolder.url);
-                                                    if (bookResponse.ok) {
-                                                        const files = await bookResponse.json();
-                                                        const bookFile = files.find(file =>
-                                                            file.name.endsWith('.epub') ||
-                                                            file.name.endsWith('.pdf') ||
-                                                            file.name.endsWith('.mobi')
-                                                        );
-                                                        const imageFile = files.find(file =>
-                                                            file.name.endsWith('.jpg') ||
-                                                            file.name.endsWith('.png') ||
-                                                            file.name.endsWith('.jpeg')
-                                                        );
-
-                                                        if (bookFile) {
-                                                            collections[type.name].push({
-                                                                name: bookFolder.name.replace(/_/g, " "),
-                                                                path: bookFile.download_url,
-                                                                cover: imageFile ? imageFile.download_url : null
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            }));
-                                        }
+                                    const isCollection = /\[.*\]/.test(type.name);
+                                    if (isCollection) {
+                                        const collectionName = type.name.replace(/_/g, " ").replace(/\[|\]/g, "");
+                                        books.push({
+                                            name: collectionName,
+                                            path: type.url,
+                                            author: authorName,
+                                            type: "Collection",
+                                            format: "N/A",
+                                            cover: null // Placeholder cover
+                                        });
                                     } else {
-                                        // It's a regular type with books
                                         const bookFoldersResponse = await fetch(type.url);
                                         if (bookFoldersResponse.ok) {
                                             const bookFolders = await bookFoldersResponse.json();
@@ -185,94 +148,116 @@
                     }
                 });
                 await Promise.all(fetchPromises);
-                filteredBooks = [...books]; // Initially, filtered books are all books
+                filteredBooks = [...books];
                 displayBooks(filteredBooks);
+                fetchCovers(filteredBooks);
             } else {
                 console.error('Failed to fetch books from GitHub');
             }
         }
 
-        // Display books or collections
         function displayBooks(bookArray) {
             const bookList = document.getElementById('bookList');
-            const collectionView = document.getElementById('collectionView');
-            bookList.style.display = 'block';
-            collectionView.style.display = 'none';
-            bookList.innerHTML = bookArray.map((book, index) => `
-                <li>
-                    <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover">
-                    <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
-                    <span>- ${book.author} | ${book.format}</span>
-                </li>
-            `).join('') + Object.keys(collections).map(collectionName => `
-                <li>
-                    <img src="https://via.placeholder.com/50x70?text=Collection" alt="Collection">
-                    <a href="#" onclick="displayCollection('${collectionName}')">${collectionName.replace(/\[|\]/g, '')}</a>
-                    <span>- Collection</span>
-                </li>
-            `).join('');
+            bookList.innerHTML = bookArray.map((book, index) => {
+                if (book.type === "Collection") {
+                    return `
+                        <li>
+                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=Collection'}" alt="Collection Cover" data-book="${book.name}">
+                            <a href="#" onclick="viewCollection(${index})">${book.name} (${book.type})</a>
+                            <span>- ${book.author}</span>
+                        </li>
+                    `;
+                } else {
+                    return `
+                        <li>
+                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover" data-book="${book.name}">
+                            <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
+                            <span>- ${book.author} | ${book.format}</span>
+                        </li>
+                    `;
+                }
+            }).join('');
         }
 
-        // Display a collection
-        function displayCollection(collectionName) {
-            currentCollection = collections[collectionName];
-            const collectionList = document.getElementById('collectionList');
+        function viewCollection(index) {
+            const collection = filteredBooks[index];
+            fetch(collection.path)
+                .then(response => response.json())
+                .then(async (files) => {
+                    const collectionBooks = [];
+                    for (const file of files) {
+                        if (file.type === 'dir') {
+                            const bookFolderResponse = await fetch(file.url);
+                            const bookFolder = await bookFolderResponse.json();
+                            const bookFile = bookFolder.find(file =>
+                                file.name.endsWith('.epub') ||
+                                file.name.endsWith('.pdf') ||
+                                file.name.endsWith('.mobi')
+                            );
+                            const imageFile = bookFolder.find(file =>
+                                file.name.endsWith('.jpg') ||
+                                file.name.endsWith('.png') ||
+                                file.name.endsWith('.jpeg')
+                            );
+                            if (bookFile) {
+                                collectionBooks.push({
+                                    name: file.name.replace(/_/g, " "),
+                                    path: bookFile.download_url,
+                                    cover: imageFile ? imageFile.download_url : null,
+                                    format: bookFile.name.split('.').pop().toUpperCase(),
+                                });
+                            }
+                        }
+                    }
+                    displayCollectionBooks(collectionBooks, collection.name);
+                });
+        }
+
+        function displayCollectionBooks(books, collectionName) {
             const bookList = document.getElementById('bookList');
-            const collectionView = document.getElementById('collectionView');
-            bookList.style.display = 'none';
-            collectionView.style.display = 'block';
-            document.getElementById('collectionTitle').textContent = collectionName.replace(/\[|\]/g, '');
-            collectionList.innerHTML = currentCollection.map((book, index) => `
-                <li>
-                    <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover">
-                    <a href="${book.path}" download>${book.name}</a>
-                </li>
-            `).join('');
+            bookList.innerHTML = `
+                <h2>${collectionName} Collection</h2>
+                <ul>
+                    ${books.map(book => `
+                        <li>
+                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover">
+                            <a href="${book.path}" download>${book.name} (${book.format})</a>
+                        </li>
+                    `).join('')}
+                </ul>
+                <button onclick="downloadCollection('${collectionName}', ${JSON.stringify(books).replace(/"/g, '&quot;')})">Download All</button>
+                <button onclick="fetchBooksFromGitHub()">Back to Library</button>
+            `;
         }
 
-        // Download all books in a collection as a ZIP file
-        async function downloadAllBooks() {
-            if (!currentCollection) return;
-
+        function downloadCollection(name, books) {
             const zip = new JSZip();
-            const folder = zip.folder("Collection");
-
-            await Promise.all(currentCollection.map(async (book) => {
-                const response = await fetch(book.path);
-                const blob = await response.blob();
-                folder.file(`${book.name}.${book.path.split('.').pop()}`, blob);
-            }));
-
-            zip.generateAsync({ type: "blob" }).then(function(content) {
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(content);
-                link.download = "Collection.zip";
-                link.click();
+            const folder = zip.folder(name);
+            books.forEach(book => {
+                folder.file(book.name + '.' + book.format.toLowerCase(), fetch(book.path).then(res => res.blob()));
+            });
+            zip.generateAsync({ type: "blob" }).then(content => {
+                saveAs(content, `${name}.zip`);
             });
         }
 
-        // Back to main view
-        function showMainView() {
-            currentCollection = null;
+        function filterBooks() {
+            const query = document.getElementById('searchBox').value.toLowerCase();
+            filteredBooks = books.filter(book => {
+                return (
+                    book.name.toLowerCase().includes(query) || 
+                    book.author.toLowerCase().includes(query) || 
+                    book.type.toLowerCase().includes(query)
+                );
+            });
             displayBooks(filteredBooks);
         }
 
-        // Debounced search
         function debouncedFilterBooks() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const query = document.getElementById('searchBox').value.toLowerCase();
-                filteredBooks = books.filter(book =>
-                    book.name.toLowerCase().includes(query) ||
-                    book.author.toLowerCase().includes(query) ||
-                    book.type.toLowerCase().includes(query) ||
-                    book.format.toLowerCase().includes(query)
-                );
-                displayBooks(filteredBooks);
-            }, 300);
+            searchTimeout = setTimeout(filterBooks, 300);
         }
 
-        // Fetch books when the page loads
         fetchBooksFromGitHub();
     </script>
 </body>
