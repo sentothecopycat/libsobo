@@ -1,264 +1,611 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Libsobo</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
     <style>
+
         body {
+
             font-family: Arial, sans-serif;
+
             max-width: 800px;
+
             margin: auto;
+
             padding: 20px;
+
         }
+
         h1 {
+
             text-align: center;
+
         }
+
         input {
+
             width: 100%;
+
             padding: 10px;
+
             margin-bottom: 20px;
+
             border: 1px solid #ccc;
+
             border-radius: 5px;
+
         }
+
         ul {
+
             list-style-type: none;
+
             padding: 0;
+
         }
+
         li {
+
             margin: 10px 0;
+
             display: flex;
+
             align-items: center;
+
             gap: 10px;
+
         }
+
         img {
+
             width: 50px;
+
             height: 70px;
+
             object-fit: cover;
+
             border: 1px solid #ccc;
+
             border-radius: 5px;
+
         }
+
         a {
+
             text-decoration: none;
+
             color: #007BFF;
+
             flex-grow: 1;
+
         }
+
         a:hover {
+
             text-decoration: underline;
+
         }
+
         span {
+
             font-size: 0.9em;
+
             color: #555;
+
         }
-        button {
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 10px 5px 0 0;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
+
     </style>
+
 </head>
+
 <body>
+
     <h1>Libsobo</h1>
-    <p>Search and browse books, comics, and other content by author and type. Collections and books are dynamically loaded from folder contents.</p>
-    <input type="text" id="searchBox" placeholder="Search by book name, author, or type..." oninput="debouncedFilterBooks()">
+
+    <p>Search and browse books, comics, and other content by author and type. Collections are supported and allow grouped downloads.</p>
+
+    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="debouncedFilterBooks()">
+
     <ul id="bookList">
-        <!-- Book and collection links will be populated here -->
+
+        <!-- Book links will be populated here -->
+
     </ul>
 
+
+
     <script>
+
         const repoOwner = 'sentothecopycat'; // Replace with your GitHub username
+
         const repoName = 'libsobo';         // Replace with your repository name
+
         const folderPath = 'EN';           // Root folder containing author folders
 
-        let books = []; // Array to store all books and collections
-        let filteredBooks = []; // Array to store the current filtered books and collections
+
+
+        let books = []; // Array to store all books
+
+        let filteredBooks = []; // Array to store the current filtered books
+
         let searchTimeout = null; // For debounced search
 
-        // Fetch books and collections from GitHub API
+
+
+        // Fetch data recursively from GitHub API
+
         async function fetchBooksFromGitHub() {
+
             const authorResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}`);
+
             if (authorResponse.ok) {
+
                 const authorFolders = await authorResponse.json();
+
                 const fetchPromises = authorFolders.map(async (author) => {
+
                     if (author.type === 'dir') {
+
                         const authorName = author.name.replace(/_/g, " ");
+
                         const typeFoldersResponse = await fetch(author.url);
+
                         if (typeFoldersResponse.ok) {
+
                             const typeFolders = await typeFoldersResponse.json();
+
                             return Promise.all(typeFolders.map(async (type) => {
+
                                 if (type.type === 'dir') {
-                                    const isCollection = /\[.*\]/.test(type.name);
-                                    if (isCollection) {
-                                        const collectionName = type.name.replace(/_/g, " ").replace(/\[|\]/g, "");
-                                        books.push({
-                                            name: collectionName,
-                                            path: type.url,
-                                            author: authorName,
-                                            type: "Collection",
-                                            format: "N/A",
-                                            cover: null // Placeholder cover
-                                        });
+
+                                    // Check if this folder is a collection
+
+                                    if (type.name.includes('[') && type.name.includes(']')) {
+
+                                        const collectionBooks = await handleCollection(type);
+
+                                        books.push(...collectionBooks);
+
                                     } else {
+
                                         const bookFoldersResponse = await fetch(type.url);
+
                                         if (bookFoldersResponse.ok) {
+
                                             const bookFolders = await bookFoldersResponse.json();
+
                                             return Promise.all(bookFolders.map(async (bookFolder) => {
+
                                                 if (bookFolder.type === 'dir') {
+
                                                     const bookResponse = await fetch(bookFolder.url);
+
                                                     if (bookResponse.ok) {
+
                                                         const files = await bookResponse.json();
+
                                                         const bookFile = files.find(file =>
+
                                                             file.name.endsWith('.epub') ||
+
                                                             file.name.endsWith('.pdf') ||
+
                                                             file.name.endsWith('.mobi')
+
                                                         );
+
                                                         const imageFile = files.find(file =>
+
                                                             file.name.endsWith('.jpg') ||
+
                                                             file.name.endsWith('.png') ||
+
                                                             file.name.endsWith('.jpeg')
+
                                                         );
+
+
 
                                                         if (bookFile) {
+
                                                             books.push({
+
                                                                 name: bookFolder.name.replace(/_/g, " "),
+
                                                                 path: bookFile.download_url,
+
                                                                 author: authorName,
+
                                                                 type: type.name,
+
                                                                 format: bookFile.name.split('.').pop().toUpperCase(),
-                                                                cover: imageFile ? imageFile.download_url : null
+
+                                                                cover: imageFile ? imageFile.download_url : null,
+
+                                                                isCollection: false
+
                                                             });
+
                                                         }
+
                                                     }
+
                                                 }
+
                                             }));
+
                                         }
+
                                     }
+
                                 }
+
                             }));
+
                         }
+
                     }
+
                 });
+
                 await Promise.all(fetchPromises);
-                filteredBooks = [...books];
+
+                filteredBooks = [...books]; // Initially, filtered books are all books
+
                 displayBooks(filteredBooks);
+
                 fetchCovers(filteredBooks);
+
             } else {
+
                 console.error('Failed to fetch books from GitHub');
+
             }
+
         }
+
+
+
+        // Handle fetching books in a collection
+
+        async function handleCollection(typeFolder) {
+
+            const collectionBooks = [];
+
+            const collectionResponse = await fetch(typeFolder.url);
+
+            if (collectionResponse.ok) {
+
+                const bookFolders = await collectionResponse.json();
+
+                for (const bookFolder of bookFolders) {
+
+                    if (bookFolder.type === 'dir') {
+
+                        const bookResponse = await fetch(bookFolder.url);
+
+                        if (bookResponse.ok) {
+
+                            const files = await bookResponse.json();
+
+                            const bookFile = files.find(file =>
+
+                                file.name.endsWith('.epub') ||
+
+                                file.name.endsWith('.pdf') ||
+
+                                file.name.endsWith('.mobi')
+
+                            );
+
+                            const imageFile = files.find(file =>
+
+                                file.name.endsWith('.jpg') ||
+
+                                file.name.endsWith('.png') ||
+
+                                file.name.endsWith('.jpeg')
+
+                            );
+
+                            if (bookFile) {
+
+                                collectionBooks.push({
+
+                                    name: bookFolder.name.replace(/_/g, " "),
+
+                                    path: bookFile.download_url,
+
+                                    author: typeFolder.name.replace(/_/g, " ").replace(/\[|\]/g, ""),
+
+                                    type: "Collection",
+
+                                    format: bookFile.name.split('.').pop().toUpperCase(),
+
+                                    cover: imageFile ? imageFile.download_url : null,
+
+                                    isCollection: true
+
+                                });
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            return collectionBooks;
+
+        }
+
+
+
+        // Fetch covers for books without an image
+
+        async function fetchCovers(bookList) {
+
+            const coverPromises = bookList.map(async (book) => {
+
+                if (!book.cover) { // Fetch cover only if not already set
+
+                    const cover = await getBookCover(book.name);
+
+                    book.cover = cover;
+
+                }
+
+                updateCover(book);
+
+            });
+
+            await Promise.all(coverPromises);
+
+        }
+
+
+
+        // Update book cover dynamically
+
+        function updateCover(book) {
+
+            const imgElement = document.querySelector(`[data-book="${book.name}"]`);
+
+            if (imgElement) imgElement.src = book.cover;
+
+        }
+
+
+
+        // Fetch cover from Google Books API or fallback to placeholder
+
+        async function getBookCover(bookTitle) {
+
+            try {
+
+                const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(bookTitle)}`);
+
+                const data = await response.json();
+
+                if (data.items && data.items[0].volumeInfo.imageLinks) {
+
+                    return data.items[0].volumeInfo.imageLinks.thumbnail;
+
+                }
+
+            } catch (error) {
+
+                console.error("Error fetching cover from Google Books API:", error);
+
+            }
+
+            return "https://via.placeholder.com/50x70?text=No+Cover";
+
+        }
+
+
+
+        // Display books in the list
 
         function displayBooks(bookArray) {
+
             const bookList = document.getElementById('bookList');
-            bookList.innerHTML = bookArray.map((book, index) => {
-                if (book.type === "Collection") {
-                    return `
-                        <li>
-                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=Collection'}" alt="Collection Cover" data-book="${book.name}">
-                            <a href="#" onclick="viewCollection(${index})">${book.name} (${book.type})</a>
-                            <span>- ${book.author}</span>
-                        </li>
-                    `;
-                } else {
-                    return `
-                        <li>
-                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover" data-book="${book.name}">
-                            <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
-                            <span>- ${book.author} | ${book.format}</span>
-                        </li>
-                    `;
-                }
-            }).join('');
+
+            bookList.innerHTML = bookArray.map((book, index) => `
+
+                <li>
+
+                    <img src="https://via.placeholder.com/50x70?text=Loading..." alt="Cover" data-book="${book.name}">
+
+                    <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
+
+                    <span>- ${book.author} | ${book.format}</span>
+
+                </li>
+
+            `).join('');
+
         }
 
-        function viewCollection(index) {
-            const collection = filteredBooks[index];
-            fetch(collection.path)
-                .then(response => response.json())
-                .then(async (files) => {
-                    const collectionBooks = [];
-                    for (const file of files) {
-                        if (file.type === 'dir') {
-                            const bookFolderResponse = await fetch(file.url);
-                            const bookFolder = await bookFolderResponse.json();
-                            const bookFile = bookFolder.find(file =>
-                                file.name.endsWith('.epub') ||
-                                file.name.endsWith('.pdf') ||
-                                file.name.endsWith('.mobi')
-                            );
-                            const imageFile = bookFolder.find(file =>
-                                file.name.endsWith('.jpg') ||
-                                file.name.endsWith('.png') ||
-                                file.name.endsWith('.jpeg')
-                            );
-                            if (bookFile) {
-                                collectionBooks.push({
-                                    name: file.name.replace(/_/g, " "),
-                                    path: bookFile.download_url,
-                                    cover: imageFile ? imageFile.download_url : null,
-                                    format: bookFile.name.split('.').pop().toUpperCase(),
-                                });
-                            }
+
+
+        // Open a new page with book preview
+
+        function openPreviewPage(index) {
+
+            const book = filteredBooks[index]; // Use the filtered books array
+
+            const previewWindow = window.open('', '_blank');
+
+            previewWindow.document.write(`
+
+                <!DOCTYPE html>
+
+                <html lang="en">
+
+                <head>
+
+                    <meta charset="UTF-8">
+
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+                    <title>${book.name} - Preview</title>
+
+                    <style>
+
+                        body {
+
+                            font-family: Arial, sans-serif;
+
+                            max-width: 800px;
+
+                            margin: auto;
+
+                            padding: 20px;
+
                         }
-                    }
-                    displayCollectionBooks(collectionBooks, collection.name);
-                });
+
+                        h1 {
+
+                            text-align: center;
+
+                        }
+
+                        img {
+
+                            max-width: 100%;
+
+                            height: auto;
+
+                            display: block;
+
+                            margin: 20px auto;
+
+                        }
+
+                        p {
+
+                            font-size: 18px;
+
+                            margin: 10px 0;
+
+                        }
+
+                        button {
+
+                            padding: 10px 20px;
+
+                            background-color: #007BFF;
+
+                            color: white;
+
+                            border: none;
+
+                            border-radius: 5px;
+
+                            cursor: pointer;
+
+                            display: block;
+
+                            margin: 20px auto;
+
+                        }
+
+                        button:hover {
+
+                            background-color: #0056b3;
+
+                        }
+
+                    </style>
+
+                </head>
+
+                <body>
+
+                    <h1>${book.name}</h1>
+
+                    <img src="${book.cover || 'https://via.placeholder.com/300x400?text=No+Cover'}" alt="Book Cover">
+
+                    <p><strong>Author:</strong> ${book.author}</p>
+
+                    <p><strong>Type:</strong> ${book.type}</p>
+
+                    <p><strong>Format:</strong> ${book.format}</p>
+
+                    <button onclick="window.location.href='${book.path}'">Download</button>
+
+                </body>
+
+                </html>
+
+            `);
+
+            previewWindow.document.close();
+
         }
 
-        function displayCollectionBooks(books, collectionName) {
-            const bookList = document.getElementById('bookList');
-            bookList.innerHTML = `
-                <h2>${collectionName} Collection</h2>
-                <ul>
-                    ${books.map(book => `
-                        <li>
-                            <img src="${book.cover || 'https://via.placeholder.com/50x70?text=No+Cover'}" alt="Cover">
-                            <a href="${book.path}" download>${book.name} (${book.format})</a>
-                        </li>
-                    `).join('')}
-                </ul>
-                <button onclick="downloadCollection('${collectionName}', ${JSON.stringify(books).replace(/"/g, '&quot;')})">Download All</button>
-                <button onclick="fetchBooksFromGitHub()">Back to Library</button>
-            `;
-        }
 
-        function downloadCollection(name, books) {
-            const zip = new JSZip();
-            const folder = zip.folder(name);
-            books.forEach(book => {
-                folder.file(book.name + '.' + book.format.toLowerCase(), fetch(book.path).then(res => res.blob()));
-            });
-            zip.generateAsync({ type: "blob" }).then(content => {
-                saveAs(content, `${name}.zip`);
-            });
-        }
+
+        // Filter books based on search query (debounced)
 
         function filterBooks() {
+
             const query = document.getElementById('searchBox').value.toLowerCase();
+
             filteredBooks = books.filter(book => {
+
                 return (
+
                     book.name.toLowerCase().includes(query) || 
+
                     book.author.toLowerCase().includes(query) || 
-                    book.type.toLowerCase().includes(query)
+
+                    book.type.toLowerCase().includes(query) || 
+
+                    book.format.toLowerCase().includes(query)
+
                 );
+
             });
+
             displayBooks(filteredBooks);
+
+            fetchCovers(filteredBooks); // Fetch covers for the filtered books
+
         }
+
+
+
+        // Debounce for search input
 
         function debouncedFilterBooks() {
+
             clearTimeout(searchTimeout);
+
             searchTimeout = setTimeout(filterBooks, 300);
+
         }
 
+
+
+        // Fetch books when the page loads
+
         fetchBooksFromGitHub();
+
     </script>
+
 </body>
+
 </html>
