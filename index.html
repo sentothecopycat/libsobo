@@ -50,12 +50,16 @@
             font-size: 0.9em;
             color: #555;
         }
+        .collection-title {
+            font-weight: bold;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
     <h1>Libsobo</h1>
-    <p>Search and browse books, comics, and other content by author and type. Covers are loaded dynamically from folder contents.</p>
-    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="debouncedFilterBooks()">
+    <p>Search and browse books, comics, and collections by author and type. Covers are loaded dynamically from folder contents.</p>
+    <input type="text" id="searchBox" placeholder="Search by book name, author, type, or format..." oninput="debouncedFilterBooks()">
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
@@ -82,38 +86,77 @@
                             const typeFolders = await typeFoldersResponse.json();
                             return Promise.all(typeFolders.map(async (type) => {
                                 if (type.type === 'dir') {
-                                    const bookFoldersResponse = await fetch(type.url);
-                                    if (bookFoldersResponse.ok) {
-                                        const bookFolders = await bookFoldersResponse.json();
-                                        return Promise.all(bookFolders.map(async (bookFolder) => {
-                                            if (bookFolder.type === 'dir') {
-                                                const bookResponse = await fetch(bookFolder.url);
-                                                if (bookResponse.ok) {
-                                                    const files = await bookResponse.json();
-                                                    const bookFile = files.find(file =>
-                                                        file.name.endsWith('.epub') ||
-                                                        file.name.endsWith('.pdf') ||
-                                                        file.name.endsWith('.mobi')
-                                                    );
-                                                    const imageFile = files.find(file =>
-                                                        file.name.endsWith('.jpg') ||
-                                                        file.name.endsWith('.png') ||
-                                                        file.name.endsWith('.jpeg')
-                                                    );
+                                    if (type.name.startsWith("[") && type.name.endsWith("]")) {
+                                        // This is a collection
+                                        const collectionName = type.name.slice(1, -1); // Remove [ ] from the name
+                                        const bookFoldersResponse = await fetch(type.url);
+                                        if (bookFoldersResponse.ok) {
+                                            const bookFolders = await bookFoldersResponse.json();
+                                            return Promise.all(bookFolders.map(async (bookFolder) => {
+                                                if (bookFolder.type === 'dir') {
+                                                    const bookResponse = await fetch(bookFolder.url);
+                                                    if (bookResponse.ok) {
+                                                        const files = await bookResponse.json();
+                                                        const bookFile = files.find(file =>
+                                                            file.name.endsWith('.epub') ||
+                                                            file.name.endsWith('.pdf') ||
+                                                            file.name.endsWith('.mobi')
+                                                        );
+                                                        const imageFile = files.find(file =>
+                                                            file.name.endsWith('.jpg') ||
+                                                            file.name.endsWith('.png') ||
+                                                            file.name.endsWith('.jpeg')
+                                                        );
 
-                                                    if (bookFile) {
-                                                        books.push({
-                                                            name: bookFolder.name.replace(/_/g, " "),
-                                                            path: bookFile.download_url,
-                                                            author: authorName,
-                                                            type: type.name,
-                                                            format: bookFile.name.split('.').pop().toUpperCase(),
-                                                            cover: imageFile ? imageFile.download_url : null // Use image if exists
-                                                        });
+                                                        if (bookFile) {
+                                                            books.push({
+                                                                name: bookFolder.name.replace(/_/g, " "),
+                                                                path: bookFile.download_url,
+                                                                author: authorName,
+                                                                type: `Collection: ${collectionName}`,
+                                                                format: bookFile.name.split('.').pop().toUpperCase(),
+                                                                cover: imageFile ? imageFile.download_url : null
+                                                            });
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        }));
+                                            }));
+                                        }
+                                    } else {
+                                        // Normal type folder with book folders
+                                        const bookFoldersResponse = await fetch(type.url);
+                                        if (bookFoldersResponse.ok) {
+                                            const bookFolders = await bookFoldersResponse.json();
+                                            return Promise.all(bookFolders.map(async (bookFolder) => {
+                                                if (bookFolder.type === 'dir') {
+                                                    const bookResponse = await fetch(bookFolder.url);
+                                                    if (bookResponse.ok) {
+                                                        const files = await bookResponse.json();
+                                                        const bookFile = files.find(file =>
+                                                            file.name.endsWith('.epub') ||
+                                                            file.name.endsWith('.pdf') ||
+                                                            file.name.endsWith('.mobi')
+                                                        );
+                                                        const imageFile = files.find(file =>
+                                                            file.name.endsWith('.jpg') ||
+                                                            file.name.endsWith('.png') ||
+                                                            file.name.endsWith('.jpeg')
+                                                        );
+
+                                                        if (bookFile) {
+                                                            books.push({
+                                                                name: bookFolder.name.replace(/_/g, " "),
+                                                                path: bookFile.download_url,
+                                                                author: authorName,
+                                                                type: type.name,
+                                                                format: bookFile.name.split('.').pop().toUpperCase(),
+                                                                cover: imageFile ? imageFile.download_url : null
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }));
+                                        }
                                     }
                                 }
                             }));
@@ -164,18 +207,42 @@
         // Display books in the list
         function displayBooks(bookArray) {
             const bookList = document.getElementById('bookList');
-            bookList.innerHTML = bookArray.map((book, index) => `
-                <li>
-                    <img src="https://via.placeholder.com/50x70?text=Loading..." alt="Cover" data-book="${book.name}">
-                    <a href="#" onclick="openPreviewPage(${index})">${book.name} (${book.type})</a>
-                    <span>- ${book.author} | ${book.format}</span>
-                </li>
-            `).join('');
+            bookList.innerHTML = '';
+            const collections = {};
+
+            // Group by collection or type
+            bookArray.forEach((book) => {
+                const typeKey = book.type;
+                if (!collections[typeKey]) {
+                    collections[typeKey] = [];
+                }
+                collections[typeKey].push(book);
+            });
+
+            // Render books grouped by type or collection
+            for (const type in collections) {
+                const booksInType = collections[type];
+                const typeTitle = document.createElement('div');
+                typeTitle.classList.add('collection-title');
+                typeTitle.textContent = type;
+                bookList.appendChild(typeTitle);
+
+                booksInType.forEach((book) => {
+                    const bookItem = document.createElement('li');
+                    bookItem.innerHTML = `
+                        <img src="https://via.placeholder.com/50x70?text=Loading..." alt="Cover" data-book="${book.name}">
+                        <a href="#" onclick="openPreviewPage('${book.name}')">${book.name}</a>
+                        <span>- ${book.author} | ${book.format}</span>
+                    `;
+                    bookList.appendChild(bookItem);
+                });
+            }
         }
 
         // Open a new page with book preview
-        function openPreviewPage(index) {
-            const book = filteredBooks[index]; // Use the filtered books array
+        function openPreviewPage(bookName) {
+            const book = books.find(b => b.name === bookName);
+            if (!book) return;
             const previewWindow = window.open('', '_blank');
             previewWindow.document.write(`
                 <!DOCTYPE html>
