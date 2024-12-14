@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Libsobo</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css"> <!-- Ensure your CSS file path is correct -->
 </head>
 <body>
     <h1>Libsobo</h1>
     <p>Search and browse books, comics, and other content by author and type. Covers are loaded dynamically from folder contents.</p>
-    <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="debouncedFilterBooks()">
+    <input type="text" id="searchBox" placeholder="Search by book name, author, or format...">
     <ul id="bookList">
         <!-- Book links will be populated here -->
     </ul>
-    <script src="script.js"></script>
+    <script type="module" src="main.js"></script> <!-- Use the main script as the entry point -->
 </body>
 </html>
