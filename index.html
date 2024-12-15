@@ -5,57 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Libsobo</title>
     <style>
-        /* Light Theme (default) */
-        :root {
-            --background-color: #ffffff;
-            --text-color: #000000;
-            --link-color: #007BFF;
-            --placeholder-color: #f5f5f5;
-        }
-
-        /* Dark Theme */
-        [data-theme="dark"] {
-            --background-color: #121212;
-            --text-color: #ffffff;
-            --link-color: #66aaff;
-            --placeholder-color: #2a2a2a;
-        }
-
         body {
             font-family: Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
             max-width: 800px;
             margin: auto;
             padding: 20px;
         }
-
         h1 {
             text-align: center;
         }
-
         input {
             width: 100%;
             padding: 10px;
             margin-bottom: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
-            background-color: var(--placeholder-color);
-            color: var(--text-color);
         }
-
         ul {
             list-style-type: none;
             padding: 0;
         }
-
         li {
             margin: 10px 0;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-
         img {
             width: 50px;
             height: 70px;
@@ -63,48 +38,21 @@
             border: 1px solid #ccc;
             border-radius: 5px;
         }
-
         a {
             text-decoration: none;
-            color: var(--link-color);
+            color: #007BFF;
             flex-grow: 1;
         }
-
         a:hover {
             text-decoration: underline;
         }
-
         span {
             font-size: 0.9em;
-            color: var(--text-color);
-        }
-
-        /* Dark mode toggle button */
-        .dark-mode-toggle {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .dark-mode-toggle button {
-            padding: 10px 20px;
-            background-color: var(--link-color);
-            color: #ffffff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .dark-mode-toggle button:hover {
-            background-color: #0056b3;
+            color: #555;
         }
     </style>
 </head>
 <body>
-    <div class="dark-mode-toggle">
-        <button id="themeToggle">Switch to Dark Mode</button>
-    </div>
-
     <h1>Libsobo</h1>
     <p>Search and browse books, comics, and other content by author and type. Covers are loaded dynamically from folder contents.</p>
     <input type="text" id="searchBox" placeholder="Search by book name, author, or format..." oninput="debouncedFilterBooks()">
@@ -120,23 +68,6 @@
         let books = []; // Array to store all books
         let filteredBooks = []; // Array to store the current filtered books
         let searchTimeout = null; // For debounced search
-
-        // Dark mode toggle logic
-        const themeToggleButton = document.getElementById('themeToggle');
-        const rootElement = document.documentElement;
-
-        function toggleDarkMode() {
-            const isDarkMode = rootElement.getAttribute('data-theme') === 'dark';
-            if (isDarkMode) {
-                rootElement.removeAttribute('data-theme'); // Switch to light mode
-                themeToggleButton.textContent = 'Switch to Dark Mode';
-            } else {
-                rootElement.setAttribute('data-theme', 'dark'); // Switch to dark mode
-                themeToggleButton.textContent = 'Switch to Light Mode';
-            }
-        }
-
-        themeToggleButton.addEventListener('click', toggleDarkMode);
 
         // Fetch data recursively from GitHub API
         async function fetchBooksFromGitHub() {
@@ -240,6 +171,65 @@
                     <span>- ${book.author} | ${book.format}</span>
                 </li>
             `).join('');
+        }
+
+        // Open a new page with book preview
+        function openPreviewPage(index) {
+            const book = filteredBooks[index]; // Use the filtered books array
+            const previewWindow = window.open('', '_blank');
+            previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${book.name} - Preview</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            max-width: 800px;
+                            margin: auto;
+                            padding: 20px;
+                        }
+                        h1 {
+                            text-align: center;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                            display: block;
+                            margin: 20px auto;
+                        }
+                        p {
+                            font-size: 18px;
+                            margin: 10px 0;
+                        }
+                        button {
+                            padding: 10px 20px;
+                            background-color: #007BFF;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            display: block;
+                            margin: 20px auto;
+                        }
+                        button:hover {
+                            background-color: #0056b3;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${book.name}</h1>
+                    <img src="${book.cover || 'https://via.placeholder.com/300x400?text=No+Cover'}" alt="Book Cover">
+                    <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>Type:</strong> ${book.type}</p>
+                    <p><strong>Format:</strong> ${book.format}</p>
+                    <button onclick="window.location.href='${book.path}'">Download</button>
+                </body>
+                </html>
+            `);
+            previewWindow.document.close();
         }
 
         // Filter books based on search query (debounced)
